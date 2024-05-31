@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from bson import ObjectId
 from pymongo.errors import PyMongoError, OperationFailure, ConnectionFailure, InvalidOperation
 from passlib.context import CryptContext
-from db.models.user import User, PasswordUpdateRequest
+from db.models.user import User, UserDB, PasswordUpdateRequest
 from db.schemas.user import user_schema, users_schema
 from db.client import db_client
 
@@ -32,7 +32,7 @@ async def get_user(user_id: str):
 
 
 @router.post("/", response_model=User, status_code=status.HTTP_201_CREATED)
-async def save_user(user: User):
+async def save_user(user: UserDB):
     """Saving a new user in the database if the email is unique"""
 
     if isinstance(search_user("email", user.email), User):
@@ -42,6 +42,8 @@ async def save_user(user: User):
 
     user_dict = dict(user)
     del user_dict["id"]
+    # Encrypt the password
+    user_dict["password"] = crypt.hash(user_dict["password"])
 
     inserted_id = db_client.users.insert_one(user_dict).inserted_id
 
@@ -59,8 +61,7 @@ async def update_user(user: User):
     del user_dict["id"]
 
     try:
-        found = db_client.users.find_one_and_replace(
-            {"_id": ObjectId(user.id)}, user_dict)
+        found = db_client.users.update_one({"_id": ObjectId(user.id)}, {"$set": user_dict})
     except OperationFailure as e:
         return {"error": f"Database operation failed: {e}"}
     except ConnectionFailure as e:
@@ -70,7 +71,7 @@ async def update_user(user: User):
     except PyMongoError as e:
         return {"error": f"Unexpected MongoDB error: {e}"}
 
-    if not found:
+    if found.modified_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return search_user("_id", ObjectId(user.id))
@@ -81,6 +82,7 @@ async def update_password(user_id: str, request: PasswordUpdateRequest):
     """Update the password from the database based on the Id"""
     check_id(user_id) # Check if an Id is not a valid Id for ObjectId
 
+    # The data I want to update
     user_dict = {
         "password": crypt.hash(request.password)
     }
