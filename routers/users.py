@@ -1,24 +1,25 @@
-# Clase en vídeo: https://youtu.be/_y9qQZXE24A?t=20480
+"""Users module"""
 
-### Users DB API ###
-
-from fastapi import APIRouter, HTTPException, status
+from datetime import datetime, timedelta, timezone
+from typing import Annotated
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from bson import ObjectId
+import jwt
 from pymongo.errors import PyMongoError, OperationFailure, ConnectionFailure, InvalidOperation
-from passlib.context import CryptContext
 from db.models.user import User, UserDB, PasswordUpdateRequest
 from db.schemas.user import user_schema, users_schema
 from db.client import db_client
+from routers.helpers.users_helper import secret_key, algorithm, access_token_duration, pwd_context
+from routers.helpers.users_helper import get_current_user, search_user, check_id
 
 router = APIRouter(prefix="/user",
                    tags=["user"],
                    responses={status.HTTP_404_NOT_FOUND: {"message": "No encontrado"}})
 
-crypt = CryptContext(schemes=["bcrypt"])
-
 
 @router.get("/", response_model=list[User])
-async def users():
+async def users(current_user: Annotated[User, Depends(get_current_user)],):
     """Get all users from the database"""
     return users_schema(db_client.users.find())
 
@@ -43,7 +44,7 @@ async def save_user(user: UserDB):
     user_dict = dict(user)
     del user_dict["id"]
     # Encrypt the password
-    user_dict["password"] = crypt.hash(user_dict["password"])
+    user_dict["password"] = pwd_context.hash(user_dict["password"])
 
     inserted_id = db_client.users.insert_one(user_dict).inserted_id
 
@@ -84,7 +85,7 @@ async def update_password(user_id: str, request: PasswordUpdateRequest):
 
     # The data I want to update
     user_dict = {
-        "password": crypt.hash(request.password)
+        "password": pwd_context.hash(request.password)
     }
 
     try:
@@ -111,30 +112,22 @@ async def delete_user(id_user: str):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
 
-# Helper
-
-def search_user(field: str, key):
-    """Search a user in the database"""
-    try:
-        found = db_client.users.find_one({field: key})
-
-        if not found:
-            return None
-
-        return User(**user_schema(found))
-    except OperationFailure as e:
-        return {"error": f"Database operation failed: {e}"}
-    except ConnectionFailure as e:
-        return {"error": f"Failed to connect to database: {e}"}
-    except InvalidOperation as e:
-        return {"error": f"Invalid database operation: {e}"}
-    except PyMongoError as e:
-        return {"error": f"Unexpected MongoDB error: {e}"}
-
-
-def check_id(user_id: str):
-    """Check if an Id is not a valid Id for ObjectId"""
-    if not ObjectId.is_valid(user_id):
+@router.post("/login")
+async def login(form: Annotated[OAuth2PasswordRequestForm, Depends()],):
+    """This method allow you to login in the app"""
+    user = search_user("username", form.username, True)
+    if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="The ID does not exist.")
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username is incorrect")
+
+    if not pwd_context.verify(form.password, user.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Please verify your credentials")
+
+    access_token = {"sub": user.username,
+                    "exp": datetime.now(timezone.utc) + timedelta(minutes=access_token_duration)}
+
+    return {
+        "access_token": jwt.encode(access_token, secret_key, algorithm=algorithm),
+        "token_type": "bearer"
+    }
