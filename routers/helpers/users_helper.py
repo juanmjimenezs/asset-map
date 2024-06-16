@@ -18,7 +18,7 @@ from db.client import db_client
 load_dotenv()
 secret_key = os.getenv("SECRET_KEY")
 algorithm = os.getenv("ALGORITHM")
-access_token_duration = os.getenv("ACCESS_TOKEN_DURATION")
+access_token_duration = int(os.getenv("ACCESS_TOKEN_DURATION"))
 
 router = APIRouter(prefix="/user",
                    tags=["user"],
