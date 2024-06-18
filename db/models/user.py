@@ -16,6 +16,14 @@ class UserDB(User):
     password: str
 
 
+class NewUser(UserDB):
+    """Class representing a new user"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)  # Initialize the attributes of the base class
+        del self.id  # Remove the attribute that we do not want to inherit (It's because a new user don't have id)
+
+
 class PasswordUpdateRequest(BaseModel):
     """Class representing a password in database"""
 

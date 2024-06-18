@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from bson import ObjectId
 import jwt
 from pymongo.errors import PyMongoError, OperationFailure, ConnectionFailure, InvalidOperation
-from db.models.user import User, UserDB, PasswordUpdateRequest
+from db.models.user import User, UserDB, NewUser, PasswordUpdateRequest
 from db.schemas.user import user_schema, users_schema
 from db.client import db_client
 from routers.helpers.users_helper import secret_key, algorithm, access_token_duration, pwd_context
@@ -19,13 +19,13 @@ router = APIRouter(prefix="/user",
 
 
 @router.get("/", response_model=list[User])
-async def users(current_user: Annotated[User, Depends(get_current_user)],):
+async def users(_: Annotated[User, Depends(get_current_user)],):
     """Get all users from the database"""
     return users_schema(db_client.users.find())
 
 
 @router.get("/{user_id}")  # Path
-async def get_user(user_id: str):
+async def get_user(user_id: str, _: Annotated[User, Depends(get_current_user)]):
     """Get the user from the database based on the Id"""
     check_id(user_id)
 
@@ -33,7 +33,7 @@ async def get_user(user_id: str):
 
 
 @router.post("/", response_model=User, status_code=status.HTTP_201_CREATED)
-async def save_user(user: UserDB):
+async def save_user(user: NewUser, _: Annotated[User, Depends(get_current_user)]):
     """Saving a new user in the database if the email is unique"""
 
     if isinstance(search_user("email", user.email), User):
@@ -42,7 +42,7 @@ async def save_user(user: UserDB):
             detail="The user exists, please choose another email.")
 
     user_dict = dict(user)
-    del user_dict["id"]
+
     # Encrypt the password
     user_dict["password"] = pwd_context.hash(user_dict["password"])
 
@@ -54,7 +54,7 @@ async def save_user(user: UserDB):
 
 
 @router.put("/", response_model=User)
-async def update_user(user: User):
+async def update_user(user: User, _: Annotated[User, Depends(get_current_user)]):
     """Update the user from the database based on the Id"""
     check_id(user.id) # Check if an Id is not a valid Id for ObjectId
 
@@ -79,7 +79,7 @@ async def update_user(user: User):
 
 
 @router.patch("/password/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def update_password(user_id: str, request: PasswordUpdateRequest):
+async def update_password(user_id: str, request: PasswordUpdateRequest, _: Annotated[User, Depends(get_current_user)]):
     """Update the password from the database based on the Id"""
     check_id(user_id) # Check if an Id is not a valid Id for ObjectId
 
@@ -103,10 +103,12 @@ async def update_password(user_id: str, request: PasswordUpdateRequest):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
 
-@router.delete("/{id_user}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(id_user: str):
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(user_id: str, _: Annotated[User, Depends(get_current_user)]):
     """Delete the user from the database based on the Id"""
-    found = db_client.users.find_one_and_delete({"_id": ObjectId(id_user)})
+    check_id(user_id) # Check if an Id is not a valid Id for ObjectId
+
+    found = db_client.users.find_one_and_delete({"_id": ObjectId(user_id)})
 
     if not found:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
