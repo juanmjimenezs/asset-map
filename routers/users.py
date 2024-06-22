@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from bson import ObjectId
 import jwt
 from pymongo.errors import PyMongoError, OperationFailure, ConnectionFailure, InvalidOperation
-from db.models.user import User, UserDB, NewUser, PasswordUpdateRequest
+from db.models.user import User, NewUser, PasswordUpdateRequest
 from db.schemas.user import user_schema, users_schema
 from db.client import db_client
 from routers.helpers.users_helper import secret_key, algorithm, access_token_duration, pwd_context
