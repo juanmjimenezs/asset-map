@@ -33,8 +33,9 @@ async def get_user(user_id: str, _: Annotated[User, Depends(get_current_user)]):
 
 
 @router.post("/", response_model=User, status_code=status.HTTP_201_CREATED)
-async def save_user(user: NewUser, _: Annotated[User, Depends(get_current_user)]):
-    """Saving a new user in the database if the email is unique"""
+async def save_user(user: NewUser):
+    """Saving a new user in the database if the email is unique,
+       it's not necesary to be authenticated"""
 
     if isinstance(search_user("email", user.email), User):
         raise HTTPException(
