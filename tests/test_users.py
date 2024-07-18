@@ -6,14 +6,13 @@ from db.models.user import User
 from db.client import db_client
 from db.schemas.user import user_schema
 from routers.helpers.users_helper import pwd_context
-from bson import ObjectId
 
 client = TestClient(app)
 
 user_dict = {
-    "username": "juanma_test",
-    "email": "juanma_test@gmail.com",
-    "password": "juamma_test"
+    "username": "test_user",
+    "email": "test_email@gmail.com",
+    "password": "test_password"
 }
 
 def test_user_list_not_authenticated():
@@ -67,6 +66,36 @@ def test_user_login():
     assert response.status_code == 200
     assert response.json()['access_token']
     assert response.json()['token_type'] == 'bearer'
+    #Cleaning up
+    delete_user(user_dict)
+
+def test_create_user_failed():
+    """
+    Test case to fail creating a duplicated user.
+    """
+    #Inserting a user in database
+    save_user(user_dict)
+    #Calling the service to create an existing user
+    response = client.post("/user/", json=user_dict)
+
+    assert response.status_code == 404
+    assert response.json()['detail'] == "The user exists, please choose another email."
+    #Cleaning up
+    delete_user(user_dict)
+
+def test_create_user():
+    """
+    Test case to create a user.
+    """
+    #Cleaning up
+    delete_user(user_dict)
+    #Calling the service to create a user
+    response = client.post("/user/", json=user_dict)
+
+    assert response.status_code == 201
+    assert response.json()['id'] is not None
+    assert response.json()['username'] is not None
+    assert response.json()['email'] is not None
     #Cleaning up
     delete_user(user_dict)
 
