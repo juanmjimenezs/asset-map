@@ -71,11 +71,3 @@ def search_user(field: str, key, with_id=False):
         return {"error": f"Invalid database operation: {e}"}
     except PyMongoError as e:
         return {"error": f"Unexpected MongoDB error: {e}"}
-
-
-def check_id(user_id: str):
-    """Check if an Id is not a valid Id for ObjectId"""
-    if not ObjectId.is_valid(user_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="The ID does not exist.")

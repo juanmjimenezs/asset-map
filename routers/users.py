@@ -11,7 +11,8 @@ from db.models.user import User, NewUser, PasswordUpdateRequest
 from db.schemas.user import user_schema, users_schema
 from db.client import db_client
 from routers.helpers.users_helper import secret_key, algorithm, access_token_duration, pwd_context
-from routers.helpers.users_helper import get_current_user, search_user, check_id
+from routers.helpers.users_helper import get_current_user, search_user
+from routers.helpers.helper import check_id
 
 router = APIRouter(prefix="/user",
                    tags=["user"],
