@@ -2,7 +2,16 @@
 
 from pydantic import BaseModel, Field
 
-class Asset(BaseModel):
+
+class NewAsset(BaseModel):
+    """Class representing a new asset"""
+
+    mnemonic: str
+    price: float
+    shares: int
+
+
+class Asset(NewAsset):
     """Class representing an asset"""
 
     id: str = Field(default=None)
@@ -12,9 +21,8 @@ class Asset(BaseModel):
     shares: int
 
 
-class NewAsset(Asset):
-    """Class representing a new asset"""
+class PortfolioItem(BaseModel):
+    """Class representing a portfolio item"""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)  # Initialize the attributes of the base class
-        del self.id  # Remove the attribute that we do not want to inherit (It's because a new user don't have id)
+    mnemonic: str = Field(default=None)
+    percentage: float = Field(default=None)

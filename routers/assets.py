@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pymongo.errors import PyMongoError, OperationFailure, ConnectionFailure, InvalidOperation
 from bson import ObjectId
 from db.models.user import User
-from db.models.asset import Asset, NewAsset
+from db.models.asset import Asset, NewAsset, PortfolioItem
 from db.schemas.asset import asset_schema, assets_schema
 from db.client import db_client
 from routers.helpers.users_helper import get_current_user
@@ -21,6 +21,24 @@ router = APIRouter(prefix="/asset",
 async def assets(user: Annotated[User, Depends(get_current_user)],):
     """Get all assets for the user in session from the database"""
     return assets_schema(db_client.assets.find({"user_id": user.id}))
+
+
+@router.get("/portfolio", response_model=list[PortfolioItem])
+async def portfolio(user: Annotated[User, Depends(get_current_user)],):
+    """Calculate the percentage of your portfolio for each asset"""
+    assets_db = assets_schema(db_client.assets.find({"user_id": user.id}))
+    # Total money in my portfolio
+    total = sum(asset['shares']*asset['price'] for asset in assets_db)
+    # Calculating the percentage by asset
+    portfolio_items = []
+    for asset in assets_db:
+        portfolio_item = PortfolioItem()
+        portfolio_item.mnemonic = asset['mnemonic']
+        portfolio_item.percentage = (asset['shares']*asset['price']*100)/total
+        portfolio_items.append(portfolio_item)
+
+    return portfolio_items
+
 
 @router.post("/", response_model=Asset, status_code=status.HTTP_201_CREATED)
 async def save_asset(asset: NewAsset, user: Annotated[User, Depends(get_current_user)],):
